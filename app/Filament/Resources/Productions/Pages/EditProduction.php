@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Filament\Resources\Productions\Pages;
+
+use App\Filament\Resources\Productions\ProductionResource;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
+use Filament\Resources\Pages\EditRecord;
+
+class EditProduction extends EditRecord
+{
+    protected static string $resource = ProductionResource::class;
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+
+        return $data;
+
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            ViewAction::make(),
+
+            DeleteAction::make(),
+        ];
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return static::getResource()::getUrl('index');
+    }
+}
