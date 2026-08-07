@@ -38,7 +38,6 @@ return new class extends Migration
             $table->decimal('quantity', 10, 3);
 
             $table->decimal('balance_qty', 10, 3);
-            $table->unsignedBigInteger('reference_line_id')->nullable()->after('reference_id');
 
             /*
             |--------------------------------------------------------------------------
@@ -50,6 +49,9 @@ return new class extends Migration
                 ->nullable();
 
             $table->unsignedBigInteger('reference_id')
+                ->nullable();
+
+            $table->unsignedBigInteger('reference_line_id')
                 ->nullable();
 
             /*
