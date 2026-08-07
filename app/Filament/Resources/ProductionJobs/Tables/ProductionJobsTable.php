@@ -24,6 +24,7 @@ class ProductionJobsTable
                 TextColumn::make('issued_at')->dateTime('d M Y, h:i A')->sortable(),
                 TextColumn::make('issued_weight')->suffix(' kg')->sortable(),
                 TextColumn::make('returned_weight_total')->label('Returned')->suffix(' kg')->sortable(),
+                TextColumn::make('good_pcs_total')->label('Good Pieces')->sortable(),
                 TextColumn::make('status')->badge()->sortable(),
             ])
             ->filters([

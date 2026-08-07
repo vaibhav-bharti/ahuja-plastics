@@ -52,9 +52,10 @@ class ProductionJobService
 
             $return = $job->returns()->create([
                 ...Arr::only($data, [
-                    'return_date', 'feed_weight', 'reject_weight', 'good_pcs', 'remarks', 'created_by',
+                    'return_date', 'feed_weight', 'reject_weight', 'remarks', 'created_by',
                 ]),
                 'return_weight' => $returnWeight,
+                'good_pcs' => $this->goodPieces($job, $returnWeight),
                 'rate' => $rate,
                 'amount' => $this->amount($returnWeight, $rate),
             ]);
@@ -75,6 +76,7 @@ class ProductionJobService
             $return->update([
                 ...Arr::only($data, ['return_date', 'feed_weight', 'reject_weight', 'good_pcs', 'remarks']),
                 'return_weight' => $returnWeight,
+                'good_pcs' => $this->goodPieces($job, $returnWeight),
                 // The rate is intentionally retained as the original snapshot.
                 'amount' => $this->amount($returnWeight, $return->rate),
             ]);
@@ -145,5 +147,12 @@ class ProductionJobService
     private function amount(string $weight, mixed $rate): string
     {
         return number_format((float) $weight * (float) $rate, 2, '.', '');
+    }
+
+    private function goodPieces(ProductionJob $job, string $returnWeight): int
+    {
+        $pcsPerKg = (float) $job->production()->with('product')->first()?->product?->pcs_per_kg;
+
+        return (int) round((float) $returnWeight * $pcsPerKg);
     }
 }

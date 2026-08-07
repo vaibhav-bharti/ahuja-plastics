@@ -8,6 +8,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class ProductionJobReturnForm
@@ -34,6 +36,8 @@ class ProductionJobReturnForm
                         ->preload()
                         ->disabledOn('edit')
                         ->dehydrated()
+                        ->live()
+                        ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::updateGoodPieces($get, $set))
                         ->required(),
 
                     DatePicker::make('return_date')
@@ -46,6 +50,8 @@ class ProductionJobReturnForm
                         ->minValue(0)
                         ->suffix('kg')
                         ->default(0)
+                        ->live()
+                        ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::updateGoodPieces($get, $set))
                         ->required(),
 
                     TextInput::make('feed_weight')
@@ -70,6 +76,10 @@ class ProductionJobReturnForm
                         ->integer()
                         ->minValue(0)
                         ->default(0)
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->afterStateHydrated(fn (Get $get, Set $set): mixed => self::updateGoodPieces($get, $set))
+                        ->helperText('Calculated from return weight and the product PCS per KG.')
                         ->required(),
 
                     TextInput::make('rate')
@@ -89,5 +99,18 @@ class ProductionJobReturnForm
                         ->columnSpanFull(),
                 ]),
         ]);
+    }
+
+    protected static function updateGoodPieces(Get $get, Set $set): void
+    {
+        $jobId = $get('production_job_id');
+        $returnWeight = (float) ($get('return_weight') ?: 0);
+        $pcsPerKg = $jobId
+            ? (float) ProductionJob::query()
+                ->with('production.product:id,pcs_per_kg')
+                ->find($jobId)?->production?->product?->pcs_per_kg
+            : 0;
+
+        $set('good_pcs', (int) round($returnWeight * $pcsPerKg));
     }
 }
