@@ -35,6 +35,8 @@ return new class extends Migration
             */
 
             $table->decimal('quantity', 10, 3);
+            $table->decimal('consumed_qty', 10, 3)->default(0);
+            $table->decimal('remaining_qty', 10, 3)->default(0);
 
             /*
             |--------------------------------------------------------------------------

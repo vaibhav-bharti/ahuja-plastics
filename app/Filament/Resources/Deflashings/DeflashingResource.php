@@ -20,6 +20,11 @@ class DeflashingResource extends Resource
 {
     protected static ?string $model = Deflashing::class;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema

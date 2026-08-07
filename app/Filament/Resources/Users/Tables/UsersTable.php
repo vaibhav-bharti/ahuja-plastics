@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Support\EmployeeCredentials;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -71,6 +72,8 @@ class UsersTable
             ->recordActions([
 
                 ViewAction::make(),
+
+                EmployeeCredentials::whatsAppAction(),
 
                 EditAction::make(),
 

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Productions\Schemas;
 use App\Models\Product;
 use App\Models\RawMaterial;
 use App\Services\ProductionService;
+use App\Services\InventoryService;
 use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -183,12 +184,10 @@ class ProductionForm
 
                             return "{$name} — {$qty} KG";
                         })
-                        // ->live() keeps the repeater's state in sync on every
-                        // row ADD / DELETE / CLONE so the Placeholder below
-                        // (the single source of truth for the total) always
-                        // re-renders with fresh data. No afterStateUpdated
-                        // needed here anymore — the Placeholder recalculates
-                        // straight from $get('materials') on every live pass.
+                        // ->live() keeps the repeater's own state (add / remove
+                        // / edit row) propagating to the rest of the form so
+                        // the Material Consumption Summary Placeholders
+                        // (which read $get('materials')) re-render.
                         ->live()
                         ->columns([
                             'default' => 2,
@@ -212,13 +211,17 @@ class ProductionForm
                                 ->minValue(0.001)
                                 ->default(0)
                                 ->required()
-                                // ->live(onBlur: true) is enough on its own to
-                                // trigger the Placeholder's recalculation —
-                                // no afterStateUpdated needed here anymore.
-                                ->live(onBlur: true)
+                                // ->live() kept so the summary Placeholders
+                                // re-render on every qty change. No
+                                // afterStateUpdated() here — nothing needs to
+                                // be written back to state.
+                                ->live()
                                 ->suffix('KG')
                                 ->extraInputAttributes(['class' => 'text-base font-medium'])
-                                ->columnSpan(['default' => 1, 'lg' => 2]),
+                                ->columnSpan([
+                                    'default' => 1,
+                                    'lg' => 2,
+                                ]),
 
                             // Hidden for now — not important enough to show yet.
                             Textarea::make('remarks')
@@ -229,23 +232,62 @@ class ProductionForm
 
                         ]),
 
-                    // Single source of truth for the material total. Always
-                    // calculated live from $get('materials') — never reads
-                    // or writes the productions.total_material_qty column.
-                    // Works identically on Create (rows start empty) and
-                    // Edit (rows are hydrated from the materials relationship)
-                    // because both cases populate the 'materials' repeater
-                    // state the same way.
-                    Placeholder::make('total_material_qty')
-                        ->label('Total Material Used')
-                        ->content(function (Get $get): string {
+                ]),
 
-                            $total = collect($get('materials') ?? [])
-                                ->sum(fn ($row) => (float) ($row['quantity'] ?? 0));
+            /*
+            |--------------------------------------------------------------------------
+            | Material Consumption Summary
+            |--------------------------------------------------------------------------
+            | Single source of truth for material figures. Every Placeholder
+            | below is a pure read of ->get('materials'), ->get('weight_per_shot')
+            | and ->get('actual_counter') via self::computeMaterialSummary().
+            | Nothing here writes to Livewire state ($set is never called).
+            |--------------------------------------------------------------------------
+            */
 
-                            return number_format($total, 3) . ' KG';
+            Section::make('Material Consumption Summary')
+                ->icon(Heroicon::OutlinedCalculator)
+                ->columns(3)
+                ->schema([
+
+                    Placeholder::make('prepared_material')
+                        ->label('Prepared Material')
+                        ->content(fn (Get $get) => number_format(
+                            self::computeMaterialSummary($get)['prepared'],
+                            3
+                        ) . ' KG'),
+
+                    Placeholder::make('actual_consumption_display')
+                        ->label('Actual Consumption')
+                        ->content(fn (Get $get) => number_format(
+                            self::computeMaterialSummary($get)['consumption'],
+                            3
+                        ) . ' KG'),
+
+                    Placeholder::make('remaining_material_display')
+                        ->label('Remaining Hopper')
+                        ->content(fn (Get $get) => number_format(
+                            self::computeMaterialSummary($get)['remaining'],
+                            3
+                        ) . ' KG'),
+
+                    Placeholder::make('material_status_display')
+                        ->label('Status')
+                        ->content(fn (Get $get) => self::computeMaterialSummary($get)['status'])
+                        ->columnSpanFull(),
+
+                    Placeholder::make('material_breakdown')
+                        ->label('Consumption Details')
+                        ->content(function (Get $get) {
+                            $summary = self::computeMaterialSummary($get);
+
+                            if ($summary['prepared'] <= 0 || empty($summary['breakdown'])) {
+                                return 'No material added.';
+                            }
+
+                            return implode("\n", $summary['breakdown']);
                         })
-                        ->live(),
+                        ->columnSpanFull(),
 
                 ]),
 
@@ -397,7 +439,11 @@ class ProductionForm
                         ->step(0.001)
                         ->suffix('KG')
                         ->extraInputAttributes(['class' => 'text-base font-medium'])
-                        ->required(),
+                        ->required()
+                        // Live so the Material Consumption Summary
+                        // Placeholders re-render when this changes. No
+                        // afterStateUpdated() needed — nothing to write back.
+                        ->live(),
 
                     TextInput::make('actual_counter')
                         ->label('Machine Counter')
@@ -407,8 +453,30 @@ class ProductionForm
                         ->live(onBlur: true)
                         ->extraInputAttributes(['class' => 'text-base font-medium'])
                         ->required()
-                        ->afterStateUpdated(function (Get $get, Set $set) {
+                        // Blocks submission (Create AND Save on Edit) if
+                        // actual consumption exceeds prepared material.
+                        // Pure validation — never calls $set(), so it cannot
+                        // trigger the reactive loop that afterStateUpdated()
+                        // side effects used to cause. Reuses the exact same
+                        // computeMaterialSummary() logic the Placeholder
+                        // uses, so the error always matches what's on screen.
+                        ->rule(function (Get $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $summary = self::computeMaterialSummary($get);
 
+                                if ($summary['consumption'] > $summary['prepared']) {
+                                    $fail(
+                                        'Actual consumption ('
+                                        . number_format($summary['consumption'], 3)
+                                        . ' KG) exceeds prepared material ('
+                                        . number_format($summary['prepared'], 3)
+                                        . ' KG). Please add more raw material or correct the counter.'
+                                    );
+                                }
+                            };
+                        })
+                        ->validationAttribute('machine counter')
+                        ->afterStateUpdated(function (Get $get, Set $set) {
                             $result = ProductionService::productionResult(
 
                                 (int) ($get('planned_quantity') ?: 0),
@@ -475,7 +543,7 @@ class ProductionForm
                 ->dehydrated(),
 
             TextInput::make('status')
-                ->default(true)
+                ->default(false)
                 ->hidden()
                 ->dehydrated(),
 
@@ -599,5 +667,78 @@ class ProductionForm
         } catch (\Throwable $e) {
             return 0;
         }
+    }
+
+    /**
+     * Pure calculation helper for the Material Consumption Summary.
+     * Given the current form state via Get, returns a plain array — never
+     * touches Set. Called directly from Placeholder::content() closures and
+     * from the actual_counter validation rule, so both the display and the
+     * submit-blocking validation always agree on the same numbers.
+     *
+     * @return array{
+     *   prepared: float,
+     *   consumption: float,
+     *   remaining: float,
+     *   status: string,
+     *   breakdown: array<int, string>,
+     * }
+     */
+    protected static function computeMaterialSummary(Get $get): array
+    {
+        $materials = collect($get('materials') ?? [])->values();
+        $weightPerShot = (float) ($get('weight_per_shot') ?: 0);
+        $actualCounter = (float) ($get('actual_counter') ?: 0);
+        $calculation = InventoryService::materialConsumption($materials, $weightPerShot, $actualCounter);
+        $prepared = $calculation['prepared'];
+        $consumption = $calculation['consumption'];
+
+        // --- Remaining Hopper -------------------------------------------------
+        // Never goes negative when consumption exceeds what was prepared.
+        $remaining = round(max($prepared - $consumption, 0), 3);
+
+        // --- Status -------------------------------------------------------------
+        if ($prepared <= 0) {
+            $status = '⚠️ Please add raw material.';
+        } elseif ($consumption > $prepared) {
+            $status = '❌ Consumption exceeds prepared material by '
+                . number_format($consumption - $prepared, 3)
+                . ' KG';
+        } else {
+            $status = '✅ Material calculation OK';
+        }
+
+        // --- Per-material breakdown --------------------------------------------
+        // Still shown even when over-consumed.
+        $breakdown = [];
+
+        if ($prepared > 0) {
+            foreach ($materials as $index => $row) {
+                $qty = (float) ($row['quantity'] ?? 0);
+                $consumed = $calculation['allocations'][$index];
+
+                $remainingRow = round(max($qty - $consumed, 0), 3);
+
+                $material = RawMaterial::find($row['raw_material_id'] ?? null);
+
+                $breakdown[] =
+                    ($material?->name ?? 'Material')
+                    . ' : '
+                    . number_format($qty, 3)
+                    . ' KG → Consumed '
+                    . number_format($consumed, 3)
+                    . ' KG | Remaining '
+                    . number_format($remainingRow, 3)
+                    . ' KG';
+            }
+        }
+
+        return [
+            'prepared' => $prepared,
+            'consumption' => $consumption,
+            'remaining' => $remaining,
+            'status' => $status,
+            'breakdown' => $breakdown,
+        ];
     }
 }

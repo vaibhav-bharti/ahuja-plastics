@@ -10,29 +10,17 @@ class RawMaterialStock extends Model
     use HasFactory;
 
     protected $fillable = [
-
         'raw_material_id',
-
         'purchase_date',
-
         'vendor_name',
-
         'invoice_no',
-
         'purchase_qty',
-
         'available_qty',
-
         'purchase_price',
-
         'total_amount',
-
         'remarks',
-
         'status',
-
         'created_by',
-
     ];
 
     protected function casts(): array

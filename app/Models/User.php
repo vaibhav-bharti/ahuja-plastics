@@ -7,9 +7,11 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, Notifiable, HasRoles;
 
@@ -29,6 +31,8 @@ class User extends Authenticatable
         'password',
 
         'role',
+
+        'module_access',
 
         'department',
 
@@ -68,11 +72,34 @@ class User extends Authenticatable
 
             'is_active' => 'boolean',
 
+            'module_access' => 'array',
+
             'last_login_at' => 'datetime',
 
             'password' => 'hashed',
 
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'Admin' || $this->hasRole('Admin');
+    }
+
+    public function isEmployee(): bool
+    {
+        return ! $this->isAdmin();
+    }
+
+    public function hasModuleAccess(string $module): bool
+    {
+        return $this->isAdmin()
+            || in_array($module, $this->module_access ?: ['production'], true);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->is_active && $this->role !== 'Worker';
     }
 
     /**
@@ -96,6 +123,20 @@ class User extends Authenticatable
 
             $user->is_active ??= true;
 
+            if (! $user->isAdmin() && blank($user->module_access)) {
+                $user->module_access = ['production'];
+            }
+
         });
+    }
+
+    public function createdProductionJobs()
+    {
+        return $this->hasMany(ProductionJob::class, 'created_by');
+    }
+
+    public function createdProductionJobReturns()
+    {
+        return $this->hasMany(ProductionJobReturn::class, 'created_by');
     }
 }

@@ -5,6 +5,8 @@ namespace App\Filament\Widgets;
 use App\Models\Production;
 use App\Models\ProductionDowntime;
 use App\Models\ProductionMaterial;
+use App\Models\ProductionJob;
+use App\Models\ProductionJobReturn;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -29,6 +31,14 @@ class ProductionStats extends StatsOverviewWidget
 
         $difference = Production::whereDate('production_date', $today)
             ->sum('production_difference');
+
+        $openJobs = ProductionJob::whereIn('status', [
+            ProductionJob::STATUS_PENDING,
+            ProductionJob::STATUS_PARTIAL,
+        ])->count();
+
+        $todayReturns = ProductionJobReturn::whereDate('return_date', $today)
+            ->sum('return_weight');
 
         return [
 
@@ -62,6 +72,16 @@ class ProductionStats extends StatsOverviewWidget
                         ? 'success'
                         : 'danger'
                 ),
+
+            Stat::make('Open Production Jobs', number_format($openJobs))
+                ->description('Pending or partial returns')
+                ->descriptionIcon('heroicon-m-wrench-screwdriver')
+                ->color('primary'),
+
+            Stat::make('Today Job Returns', number_format($todayReturns, 3).' KG')
+                ->description('Returned production weight')
+                ->descriptionIcon('heroicon-m-arrow-uturn-left')
+                ->color('info'),
 
         ];
     }

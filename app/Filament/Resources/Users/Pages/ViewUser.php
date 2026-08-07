@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Users\Pages;
 
 use App\Filament\Resources\Users\UserResource;
+use App\Support\EmployeeCredentials;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -14,6 +15,7 @@ class ViewUser extends ViewRecord
     {
         return [
             EditAction::make(),
+            EmployeeCredentials::resetAction(),
         ];
     }
 }

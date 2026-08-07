@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\Production;
 use App\Services\ProductionCalculator;
 use App\Services\ProductionService;
+use App\Services\InventoryService;
 
 
 class ProductionObserver
@@ -18,7 +19,7 @@ class ProductionObserver
 
         $production->created_by = auth()->id();
 
-        $production->status = true;
+        $production->status ??= false;
     }
 
     /**
@@ -29,6 +30,16 @@ class ProductionObserver
         $this->calculate($production);
     }
 
+    /**
+     * Restore stock before the database cascades production_materials. The
+     * caller wraps deletion in a transaction, so a failed restore cancels the
+     * delete instead of leaving inventory and production out of sync.
+     */
+    public function deleting(Production $production): void
+    {
+        $production->load('materials');
+        InventoryService::reverseProduction($production->materials, $production);
+    }
     /**
      * Calculate Snapshot & Production Values
      */
@@ -127,4 +138,6 @@ class ProductionObserver
                 );
         }
     }
+
+
 }

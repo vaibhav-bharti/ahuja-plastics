@@ -27,4 +27,9 @@ class Action extends Model
     {
         return $this->hasMany(ProductActionRate::class);
     }
+
+    public function productionJobs()
+    {
+        return $this->hasMany(ProductionJob::class);
+    }
 }

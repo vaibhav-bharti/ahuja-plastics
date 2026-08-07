@@ -6,6 +6,7 @@ use App\Models\RawMaterial;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -25,19 +26,42 @@ class RawMaterialStockForm
 
             Section::make('Purchase Details')
                 ->description('Enter purchase information')
-                ->columns(3)
+                ->icon('heroicon-o-shopping-cart')
+                ->columns([
+                    'default' => 1,
+                    'sm'      => 2,
+                    'lg'      => 3,
+                ])
                 ->schema([
 
                     DatePicker::make('purchase_date')
+                        ->label('Purchase Date')
+                        ->prefixIcon('heroicon-o-calendar-days')
+                        ->native(false)
+                        ->displayFormat('d-m-Y')
                         ->default(now())
-                        ->required(),
+                        ->required()
+                        ->extraInputAttributes(['class' => 'text-base']),
 
                     TextInput::make('vendor_name')
+                        ->label('Vendor Name')
+                        ->prefixIcon('heroicon-o-building-storefront')
+                        ->placeholder('e.g. Sharma Traders')
                         ->required()
-                        ->maxLength(255),
+                        ->maxLength(255)
+                        ->extraInputAttributes(['class' => 'text-base']),
 
                     TextInput::make('invoice_no')
-                        ->maxLength(100),
+                        ->label('Invoice No.')
+                        ->prefixIcon('heroicon-o-document-text')
+                        ->placeholder('e.g. INV-00123')
+                        ->maxLength(100)
+                        ->extraInputAttributes(['class' => 'text-base'])
+                        ->columnSpan([
+                            'default' => 1,
+                            'sm'      => 2,
+                            'lg'      => 1,
+                        ]),
 
                 ]),
 
@@ -49,7 +73,11 @@ class RawMaterialStockForm
 
             Section::make('Material Details')
                 ->description('Select material and enter quantity')
-                ->columns(3)
+                ->icon('heroicon-o-cube')
+                ->columns([
+                    'default' => 1,
+                    'sm'      => 2,
+                ])
                 ->schema([
 
                     Select::make('raw_material_id')
@@ -57,39 +85,39 @@ class RawMaterialStockForm
                         ->relationship('material', 'name')
                         ->searchable()
                         ->preload()
+                        ->native(false)
+                        ->prefixIcon('heroicon-o-archive-box')
+                        ->placeholder('Select a material')
                         ->required()
-                        ->live(),
-
-                    TextInput::make('material_type')
-                        ->label('Material Type')
-                        ->disabled()
-                        ->dehydrated(false)
                         ->live()
-                        ->afterStateHydrated(function (Get $get, Set $set) {
-
-                            if (!$get('raw_material_id')) {
-                                return;
-                            }
-
-                            $material = RawMaterial::find(
-                                $get('raw_material_id')
-                            );
-
-                            $set(
-                                'material_type',
-                                $material?->type
-                            );
-                        }),
+                        ->default(request('raw_material_id'))
+                        ->disabled(fn () => filled(request('raw_material_id')))
+                        ->dehydrated()
+                        ->extraInputAttributes(['class' => 'text-base']),
 
                     TextInput::make('purchase_qty')
                         ->label('Purchase Qty')
                         ->numeric()
+                        ->minValue(0)
+                        ->step(0.01)
                         ->suffix('KG')
+                        ->placeholder('0.00')
                         ->required()
-                        ->live(),
+                        ->live(onBlur: true)
+                        ->extraInputAttributes(['class' => 'text-base font-medium'])
+                        ->afterStateUpdated(function (Get $get, Set $set) {
+
+                            $qty = (float) ($get('purchase_qty') ?: 0);
+                            $price = (float) ($get('purchase_price') ?: 0);
+
+                            $set('available_qty', $qty);
+                            $set('total_amount', round($qty * $price, 2));
+
+                        }),
 
                 ]),
-                            /*
+
+            /*
             |--------------------------------------------------------------------------
             | Quantity & Price
             |--------------------------------------------------------------------------
@@ -97,15 +125,33 @@ class RawMaterialStockForm
 
             Section::make('Quantity & Price')
                 ->description('Purchase quantity and pricing')
-                ->columns(4)
+                ->icon('heroicon-o-currency-rupee')
+                ->columns([
+                    'default' => 1,
+                    'sm'      => 2,
+                    'lg'      => 3,
+                ])
                 ->schema([
 
                     TextInput::make('purchase_price')
                         ->label('Purchase Price')
                         ->numeric()
+                        ->minValue(0)
+                        ->step(0.01)
                         ->prefix('₹')
+                        ->placeholder('0.00')
                         ->required()
-                        ->live(),
+                        ->live(onBlur: true)
+                        ->extraInputAttributes(['class' => 'text-base font-medium'])
+                        ->afterStateUpdated(function (Get $get, Set $set) {
+
+                            $qty = (float) ($get('purchase_qty') ?: 0);
+                            $price = (float) ($get('purchase_price') ?: 0);
+
+                            $set('available_qty', $qty);
+                            $set('total_amount', round($qty * $price, 2));
+
+                        }),
 
                     TextInput::make('available_qty')
                         ->label('Available Qty')
@@ -113,7 +159,7 @@ class RawMaterialStockForm
                         ->suffix('KG')
                         ->disabled()
                         ->dehydrated()
-                        ->live(),
+                        ->extraInputAttributes(['class' => 'text-base font-semibold text-success-600']),
 
                     TextInput::make('total_amount')
                         ->label('Total Amount')
@@ -121,56 +167,28 @@ class RawMaterialStockForm
                         ->prefix('₹')
                         ->disabled()
                         ->dehydrated()
-                        ->live(),
-
-                    TextInput::make('unit')
-                        ->default('KG')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->extraInputAttributes(['class' => 'text-base font-semibold text-success-600'])
+                        ->columnSpan([
+                            'default' => 1,
+                            'sm'      => 2,
+                            'lg'      => 1,
+                        ]),
 
                 ]),
 
             /*
-            |--------------------------------------------------------------------------
-            | Auto Calculation
-            |--------------------------------------------------------------------------
-            */
-
-            TextInput::make('dummy_calculation')
-                ->hidden()
-                ->dehydrated(false)
-                ->afterStateHydrated(function (Get $get, Set $set) {
-
-                    $qty = (float) ($get('purchase_qty') ?: 0);
-
-                    $price = (float) ($get('purchase_price') ?: 0);
-
-                    $set('available_qty', $qty);
-
-                    $set('total_amount', round($qty * $price, 2));
-
-                })
-                ->afterStateUpdated(function (Get $get, Set $set) {
-
-                    $qty = (float) ($get('purchase_qty') ?: 0);
-
-                    $price = (float) ($get('purchase_price') ?: 0);
-
-                    $set('available_qty', $qty);
-
-                    $set('total_amount', round($qty * $price, 2));
-
-                }),
-                            /*
             |--------------------------------------------------------------------------
             | Remarks
             |--------------------------------------------------------------------------
             */
 
             Section::make('Remarks')
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->collapsible()
                 ->schema([
 
-                    \Filament\Forms\Components\Textarea::make('remarks')
+                    Textarea::make('remarks')
+                        ->placeholder('Any additional notes about this purchase...')
                         ->rows(4)
                         ->columnSpanFull(),
 
@@ -183,10 +201,17 @@ class RawMaterialStockForm
             */
 
             Section::make('System Information')
-                ->columns(2)
+                ->icon('heroicon-o-cog-6-tooth')
+                ->collapsible()
+                ->collapsed(fn (string $operation) => $operation === 'create')
+                ->columns([
+                    'default' => 1,
+                    'sm'      => 2,
+                ])
                 ->schema([
 
                     Select::make('status')
+                        ->native(false)
                         ->options([
                             1 => 'Active',
                             0 => 'Inactive',

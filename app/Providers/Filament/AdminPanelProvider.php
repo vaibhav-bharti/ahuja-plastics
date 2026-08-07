@@ -20,6 +20,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\ProductionStats;
+use App\Filament\Widgets\ProductionQuickActions;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -38,11 +39,11 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
                 // FilamentInfoWidget::class,
                 ProductionStats::class,
+                ProductionQuickActions::class,
             ])
             ->middleware([
                 EncryptCookies::class,

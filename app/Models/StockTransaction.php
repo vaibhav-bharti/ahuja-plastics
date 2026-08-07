@@ -20,10 +20,13 @@ class StockTransaction extends Model
         'balance_qty',
 
         'reference_type',
+        'reference_line_id',
 
         'reference_id',
 
         'remarks',
+
+        'reversed_at',
 
         'created_by',
 
@@ -36,6 +39,8 @@ class StockTransaction extends Model
             'quantity' => 'decimal:3',
 
             'balance_qty' => 'decimal:3',
+
+            'reversed_at' => 'datetime',
 
         ];
     }

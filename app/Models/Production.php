@@ -121,4 +121,9 @@ class Production extends Model
     {
         return $this->hasMany(ProductionDowntime::class);
     }
+
+    public function jobs()
+    {
+        return $this->hasMany(ProductionJob::class);
+    }
 }

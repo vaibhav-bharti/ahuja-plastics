@@ -12,11 +12,10 @@ class ProductionMaterial extends Model
     protected $fillable = [
 
         'production_id',
-
         'raw_material_id',
-
         'quantity',
-
+        'consumed_qty',      // System Calculated
+        'remaining_qty', 
         'remarks',
 
     ];
@@ -24,6 +23,8 @@ class ProductionMaterial extends Model
     protected $casts = [
 
         'quantity' => 'decimal:3',
+        'consumed_qty' => 'decimal:3',
+        'remaining_qty' => 'decimal:3',
 
     ];
 
