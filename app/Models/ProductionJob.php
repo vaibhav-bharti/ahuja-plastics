@@ -38,6 +38,33 @@ class ProductionJob extends Model
         'good_pcs_total' => 'integer',
     ];
 
+    /** A stable, compact reference for both legacy and new jobs. */
+    public function getDisplayJobNoAttribute(): string
+    {
+        return sprintf('PJ-%05d', (int) $this->id);
+    }
+
+    /** Weight still expected back against this job. */
+    public function getPendingWeightAttribute(): string
+    {
+        return number_format(
+            max(0, (float) $this->issued_weight - $this->accountedWeight()),
+            3,
+            '.',
+            '',
+        );
+    }
+
+    public function accountedWeight(): float
+    {
+        return round(
+            (float) $this->returned_weight_total
+            + (float) $this->feed_weight_total
+            + (float) $this->reject_weight_total,
+            3,
+        );
+    }
+
     public function production()
     {
         return $this->belongsTo(Production::class);

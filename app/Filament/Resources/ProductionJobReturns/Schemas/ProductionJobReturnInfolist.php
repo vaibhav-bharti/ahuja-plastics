@@ -14,7 +14,7 @@ class ProductionJobReturnInfolist
             Section::make('Return Details')
                 ->columns(3)
                 ->schema([
-                    TextEntry::make('productionJob.job_no')->label('Job No.'),
+                    TextEntry::make('productionJob.display_job_no')->label('Job No.'),
                     TextEntry::make('productionJob.action.name')->label('Action'),
                     TextEntry::make('return_date')->date('d M Y'),
                     TextEntry::make('return_weight')->suffix(' kg'),

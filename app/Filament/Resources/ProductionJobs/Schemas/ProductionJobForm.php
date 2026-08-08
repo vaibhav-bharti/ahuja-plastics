@@ -4,7 +4,10 @@ namespace App\Filament\Resources\ProductionJobs\Schemas;
 
 use App\Models\ProductActionRate;
 use App\Models\Production;
+use App\Models\ProductionJob;
+use App\Services\ProductionJobService;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -34,8 +37,28 @@ class ProductionJobForm
                         ->searchable()
                         ->preload()
                         ->live()
-                        ->afterStateUpdated(fn (Set $set) => $set('action_id', null))
+                        ->afterStateUpdated(function (Set $set): void {
+                            $set('action_id', null);
+                        })
                         ->required(),
+
+                    Placeholder::make('production_allocation')
+                        ->label('Production Allocation')
+                        ->content(function (Get $get, ?ProductionJob $record): string {
+                            $summary = self::allocationSummary($get, $record);
+
+                            if ($summary === null) {
+                                return 'Select a production to see its allocation.';
+                            }
+
+                            return sprintf(
+                                'Production Output: %s KG · Already Assigned: %s KG · Remaining: %s KG',
+                                number_format($summary['output'], 3),
+                                number_format($summary['assigned'], 3),
+                                number_format($summary['remaining'], 3),
+                            );
+                        })
+                        ->columnSpanFull(),
 
                     Select::make('action_id')
                         ->label('Action')
@@ -51,17 +74,35 @@ class ProductionJobForm
                             return ProductActionRate::query()
                                 ->where('product_id', $productId)
                                 ->where('status', true)
+                                ->whereHas('action', fn ($query) => $query->where('status', true))
                                 ->with('action:id,name')
                                 ->get()
                                 ->mapWithKeys(fn (ProductActionRate $rate): array => [$rate->action_id => $rate->action->name])
                                 ->all();
                         })
                         ->searchable()
+                        ->live()
                         ->required(),
+
+                    Placeholder::make('action_rate_preview')
+                        ->label('Applicable Rate')
+                        ->content(function (Get $get): string {
+                            $productionId = (int) ($get('production_id') ?? 0);
+                            $actionId = (int) ($get('action_id') ?? 0);
+
+                            if (! $productionId || ! $actionId) {
+                                return 'Select production and action.';
+                            }
+
+                            $rate = app(ProductionJobService::class)
+                                ->rateForProductionAction($productionId, $actionId);
+
+                            return $rate === null ? 'No active rate configured.' : '₹'.number_format((float) $rate, 2).' per KG';
+                        }),
 
                     Select::make('worker_id')
                         ->label('Worker')
-                        ->relationship('worker', 'name')
+                        ->relationship('worker', 'name', fn ($query) => $query->where('status', true))
                         ->searchable()
                         ->preload()
                         ->required(),
@@ -76,7 +117,17 @@ class ProductionJobForm
                         ->label('Issued Weight')
                         ->numeric()
                         ->minValue(0.001)
+                        ->maxValue(function (Get $get, ?ProductionJob $record): ?float {
+                            return self::allocationSummary($get, $record)['remaining'] ?? null;
+                        })
                         ->suffix('kg')
+                        ->helperText(function (Get $get, ?ProductionJob $record): string {
+                            $summary = self::allocationSummary($get, $record);
+
+                            return $summary
+                                ? 'Maximum available: '.number_format($summary['remaining'], 3).' KG'
+                                : 'Select a production first.';
+                        })
                         ->required(),
 
                     Textarea::make('remarks')
@@ -84,5 +135,17 @@ class ProductionJobForm
                         ->columnSpanFull(),
                 ]),
         ]);
+    }
+
+    /** @return array{output: float, assigned: float, remaining: float}|null */
+    private static function allocationSummary(Get $get, ?ProductionJob $record = null): ?array
+    {
+        $productionId = (int) ($get('production_id') ?? 0);
+
+        if (! $productionId) {
+            return null;
+        }
+
+        return app(ProductionJobService::class)->allocationSummary($productionId, $record?->id);
     }
 }

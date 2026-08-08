@@ -27,7 +27,7 @@ class ProductionJobResource extends Resource
 
     protected static ?string $navigationLabel = 'Production Jobs';
 
-    protected static ?string $recordTitleAttribute = 'job_no';
+    protected static ?string $recordTitleAttribute = 'display_job_no';
 
     protected static ?int $navigationSort = 20;
 

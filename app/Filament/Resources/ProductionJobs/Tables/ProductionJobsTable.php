@@ -17,13 +17,14 @@ class ProductionJobsTable
         return $table
             ->defaultSort('issued_at', 'desc')
             ->columns([
-                TextColumn::make('job_no')->searchable()->sortable(),
+                TextColumn::make('display_job_no')->label('Job No.')->state(fn (ProductionJob $record): string => $record->display_job_no)->searchable(query: fn ($query, string $search) => $query->where('job_no', 'like', "%{$search}%"))->sortable(query: fn ($query, string $direction) => $query->orderBy('id', $direction)),
                 TextColumn::make('production.product.name')->label('Product')->searchable(),
                 TextColumn::make('action.name')->searchable(),
                 TextColumn::make('worker.name')->searchable(),
                 TextColumn::make('issued_at')->dateTime('d M Y, h:i A')->sortable(),
-                TextColumn::make('issued_weight')->suffix(' kg')->sortable(),
-                TextColumn::make('returned_weight_total')->label('Returned')->suffix(' kg')->sortable(),
+                TextColumn::make('issued_weight')->label('Issued')->suffix(' kg')->sortable(),
+                TextColumn::make('returned_weight_total')->label('Received')->suffix(' kg')->sortable(),
+                TextColumn::make('pending_weight')->label('Pending')->state(fn (ProductionJob $record): string => $record->pending_weight)->suffix(' kg'),
                 TextColumn::make('good_pcs_total')->label('Good Pieces')->sortable(),
                 TextColumn::make('status')->badge()->sortable(),
             ])

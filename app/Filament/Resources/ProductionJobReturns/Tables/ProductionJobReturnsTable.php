@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ProductionJobReturns\Tables;
 
 use App\Filament\Resources\ProductionJobReturns\ProductionJobReturnResource;
+use App\Models\ProductionJob;
 use App\Models\ProductionJobReturn;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -17,7 +18,7 @@ class ProductionJobReturnsTable
         return $table
             ->defaultSort('return_date', 'desc')
             ->columns([
-                TextColumn::make('productionJob.job_no')->label('Job No.')->searchable(),
+                TextColumn::make('productionJob.display_job_no')->label('Job No.'),
                 TextColumn::make('productionJob.action.name')->label('Action')->searchable(),
                 TextColumn::make('return_date')->date('d M Y')->sortable(),
                 TextColumn::make('return_weight')->suffix(' kg')->sortable(),
@@ -31,6 +32,7 @@ class ProductionJobReturnsTable
                 SelectFilter::make('production_job_id')
                     ->label('Job')
                     ->relationship('productionJob', 'job_no')
+                    ->getOptionLabelFromRecordUsing(fn (ProductionJob $record): string => $record->display_job_no)
                     ->searchable()
                     ->preload(),
             ])
